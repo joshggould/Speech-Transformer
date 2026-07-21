@@ -1,0 +1,8 @@
+torch
+torchaudio
+datasets>=2.14.0
+huggingface_hub>=0.20.0
+tokenizers
+torchmetrics
+tqdm
+tensorboard

@@ -1,0 +1,52 @@
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Training artifacts
+weights/
+*_weights/
+librispeech_weights/
+runs/
+run/
+*.pt
+*.pth
+*.ckpt
+
+# Tokenizers (rebuilt from data on first train)
+tokenizer_*.json
+
+# Logs / experiment tracking
+logs/
+wandb/
+lightning_logs/
+*.log
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.*
+!.env.example
+credentials.json
+*.pem
