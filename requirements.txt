@@ -6,3 +6,13 @@ tokenizers
 torchmetrics
 tqdm
 tensorboard
+
+# Phase A: desktop inference (transcribe_mic.py)
+soundfile
+sounddevice
+
+# Phase B: chunking + server (server.py); system dep: ffmpeg for m4a uploads
+silero-vad
+fastapi
+uvicorn[standard]
+python-multipart

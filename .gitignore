@@ -31,6 +31,9 @@ run/
 # Tokenizers (rebuilt from data on first train)
 tokenizer_*.json
 
+# Server job uploads (audio + transcripts, TTL-cleaned by server.py)
+server_jobs/
+
 # Logs / experiment tracking
 logs/
 wandb/
