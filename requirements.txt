@@ -6,6 +6,9 @@ tokenizers
 torchmetrics
 tqdm
 tensorboard
+# datasets>=4 decodes audio via torchcodec, which needs FFmpeg *shared* libs
+# on PATH (Windows: winget install Gyan.FFmpeg.Shared)
+torchcodec
 
 # Phase A: desktop inference (transcribe_mic.py)
 soundfile

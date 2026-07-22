@@ -66,8 +66,11 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 curl -F "file=@clip.wav" http://localhost:8000/v1/transcriptions/sync
 ```
 
-Phone uploads (AAC/m4a) need ffmpeg on the server: `winget install Gyan.FFmpeg`.
-Without it only wav/flac/ogg uploads work.
+Phone uploads (AAC/m4a) need ffmpeg on the server:
+`winget install Gyan.FFmpeg.Shared` (the *shared* build — training also needs
+its DLLs for torchcodec, which `datasets` uses to decode LibriSpeech audio).
+Without it only wav/flac/ogg uploads work. Open a fresh terminal after
+installing so PATH picks it up.
 
 ## Layout
 

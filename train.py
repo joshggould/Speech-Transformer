@@ -75,8 +75,11 @@ def run_validation(model, validation_ds, tokenizer, max_len, device, print_msg, 
         writer.flush()
 
 def get_all_sentences(ds):
-    for item in ds:
-        yield item["text"]
+    # Iterate the text column only -- iterating full rows would decode every
+    # audio file (datasets>=4 requires torchcodec for that and it's ~28k
+    # decodes wasted just to read transcripts for the tokenizer).
+    for text in ds["text"]:
+        yield text
 
 def get_or_build_tokenizer(config, ds):
     tokenizer_path = Path(config['tokenizer_file'].format("asr"))

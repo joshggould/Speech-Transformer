@@ -52,10 +52,23 @@ curl -F "file=@clip.wav" http://localhost:8000/v1/transcriptions/sync
 Checkpoints and `tokenizer_asr.json` are discovered automatically (latest
 checkpoint wins); `--checkpoint` / `--tokenizer` override.
 
-## Known items / next
+## Update (same day): training unblocked — datasets v5 audio decoding
 
-- **ffmpeg not installed** on this laptop yet — wav/flac uploads work without
-  it; phone m4a uploads need `winget install Gyan.FFmpeg`.
+First `python train.py` run crashed with `ImportError: ... install 'torchcodec'`:
+`datasets` 5.0 decodes audio via torchcodec, and even the tokenizer build was
+triggering audio decodes by iterating full rows. Fixed:
+
+- Installed `torchcodec` (0.15.0) into the venv; added to requirements.txt.
+- Installed FFmpeg **shared** build (`winget install Gyan.FFmpeg.Shared`) —
+  torchcodec needs its DLLs on PATH (open a fresh terminal after install).
+- `train.py get_all_sentences` now iterates `ds["text"]` only, so the
+  tokenizer build no longer decodes 28k audio files just to read transcripts.
+- Verified on the cached LibriSpeech (28,539 rows): text iteration works and
+  `AudioDataset[0]` decodes real audio to a (500, 80) mel with correct mask —
+  datasets 5.0's `AudioDecoder` still supports the `audio["array"]` access
+  the dataset code uses. Training is clear to run.
+
+## Known items / next
 - `train_wb.py` still contains a stale translation-era `greedy_decode` copy
   (leftover, unused by the new code) — clean up or delete later.
 - Next per PLAN.md: finish Lifetime 0 (train on LibriSpeech), pass Gates
