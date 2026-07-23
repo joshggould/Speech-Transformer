@@ -9,13 +9,15 @@ def get_config():
         "max_audio_len": 500,  # max mel time frames (must match AudioDataset)
         "d_model": 512,
         "n_mels": 80,
-        "datasource": "librispeech",  # local weight-folder name
+        "datasource": "librispeech_bpe",  # separate weights folder from WordLevel run
         "hf_dataset": "openslr/librispeech_asr",
         "model_folder": "weights",
         "model_basename": "smodel_",
-        "preload": None,  # start fresh for speech; set "latest" later if you want
+        "preload": None,  # must be None for BPE retrain (old WordLevel ckpts won't load)
+        "tokenizer_name": "asr_bpe",  # -> tokenizer_asr_bpe.json (not the old WordLevel file)
         "tokenizer_file": "tokenizer_{0}.json",
-        "experiment_name": "runs/speech_transformer"
+        "bpe_vocab_size": 4000,  # good ASR starting point; try 2000–5000
+        "experiment_name": "runs/speech_transformer_bpe"
     }
 
 def get_weights_file_path(config, epoch: str):

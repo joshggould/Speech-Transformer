@@ -11,8 +11,8 @@ from pathlib import Path
 # Huggingface datasets and tokenizers
 from datasets import load_dataset
 from tokenizers import Tokenizer
-from tokenizers.models import WordLevel
-from tokenizers.trainers import WordLevelTrainer
+from tokenizers.models import BPE
+from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Whitespace
 
 import torchmetrics
@@ -49,7 +49,10 @@ def run_validation(model, validation_ds, tokenizer, max_len, device, print_msg, 
             model_out = greedy_decode(model, encoder_input, encoder_mask, tokenizer, max_len, device)
 
             target_text = batch["text"][0]
-            model_out_text = tokenizer.decode(model_out.detach().cpu().numpy())
+            model_out_text = tokenizer.decode(
+                model_out.detach().cpu().tolist(),
+                skip_special_tokens=True,
+            )
 
             expected.append(target_text)
             predicted.append(model_out_text)
@@ -82,15 +85,30 @@ def get_all_sentences(ds):
         yield text
 
 def get_or_build_tokenizer(config, ds):
-    tokenizer_path = Path(config['tokenizer_file'].format("asr"))
-    if not Path.exists(tokenizer_path):
-        # Most code taken from: https://huggingface.co/docs/tokenizers/quicktour
-        tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
+    """Train or load a BPE tokenizer on transcripts (not WordLevel).
+
+    Uses a new filename (tokenizer_asr_bpe.json) so an old WordLevel
+    tokenizer_asr.json is never reused by accident. Delete tokenizer_asr_bpe.json
+    if you want to rebuild with a different bpe_vocab_size.
+    """
+    name = config.get("tokenizer_name", "asr_bpe")
+    tokenizer_path = Path(config["tokenizer_file"].format(name))
+    if not tokenizer_path.exists():
+        vocab_size = int(config.get("bpe_vocab_size", 4000))
+        print(f"Building BPE tokenizer (vocab_size={vocab_size}) -> {tokenizer_path}")
+        tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
         tokenizer.pre_tokenizer = Whitespace()
-        trainer = WordLevelTrainer(special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"], min_frequency=2)
+        trainer = BpeTrainer(
+            special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"],
+            vocab_size=vocab_size,
+            min_frequency=2,
+            show_progress=True,
+        )
         tokenizer.train_from_iterator(get_all_sentences(ds), trainer=trainer)
         tokenizer.save(str(tokenizer_path))
+        print(f"Saved BPE tokenizer with {tokenizer.get_vocab_size()} tokens")
     else:
+        print(f"Loading existing tokenizer from {tokenizer_path}")
         tokenizer = Tokenizer.from_file(str(tokenizer_path))
     return tokenizer
 

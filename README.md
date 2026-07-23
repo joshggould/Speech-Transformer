@@ -19,16 +19,23 @@ pip install -r requirements.txt
 python smoke_test_offline.py
 ```
 
-## Train (LibriSpeech clean train.100)
+## Train (LibriSpeech clean train.100, BPE tokenizer)
+
+Training builds `tokenizer_asr_bpe.json` on first run (vocab ~4000), then trains
+a **new** model under `librispeech_bpe_weights/`. Do **not** preload old
+WordLevel checkpoints (`librispeech_weights/`) — vocab sizes won't match.
 
 ```bash
 python train.py
 ```
 
+After the first BPE epoch saves, set `"preload": "latest"` in `config.py` to
+resume in increments.
+
 ## Test transcription (after training finishes)
 
-Training must have produced `tokenizer_asr.json` (repo root) and at least one
-checkpoint in `librispeech_weights/smodel_XX.pt`. Both are picked up
+Training must have produced `tokenizer_asr_bpe.json` (repo root) and at least one
+checkpoint in `librispeech_bpe_weights/smodel_XX.pt`. Both are picked up
 automatically — no flags needed:
 
 ```bash

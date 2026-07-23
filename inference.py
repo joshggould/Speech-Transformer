@@ -128,7 +128,8 @@ def build_dummy_tokenizer():
 
 
 def resolve_tokenizer_path(config):
-    return REPO_DIR / config["tokenizer_file"].format("asr")
+    name = config.get("tokenizer_name", "asr_bpe")
+    return REPO_DIR / config["tokenizer_file"].format(name)
 
 
 def resolve_latest_checkpoint(config):
@@ -430,7 +431,10 @@ def transcribe_waveform(model, tokenizer, waveform, sample_rate, device=None,
             source_mask = encoder_mask.unsqueeze(0).to(device)   # (1, 1, 1, T)
             ids = greedy_decode(model, source, source_mask, tokenizer,
                                 config["seq_len"], device)
-            text = tokenizer.decode([int(t) for t in ids.detach().cpu().tolist()])
+            text = tokenizer.decode(
+                [int(t) for t in ids.detach().cpu().tolist()],
+                skip_special_tokens=True,
+            )
             segments.append({"start": s / SAMPLE_RATE, "end": e / SAMPLE_RATE, "text": text})
             if progress_cb:
                 progress_cb(i + 1, len(chunks), _stitch(segments, dedup=dedup))
