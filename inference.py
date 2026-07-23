@@ -210,7 +210,7 @@ def load_model_and_tokenizer(config=None, device=None, checkpoint_path=None,
 
 
 # ---------------------------------------------------------------------------
-# Greedy decoding (moved here from train.py -- train.py imports it back)
+# Decoding: greedy + beam search (train.py imports greedy_decode / decode_sequence)
 # ---------------------------------------------------------------------------
 
 def greedy_decode(model, source, source_mask, tokenizer, max_len, device):
@@ -242,6 +242,82 @@ def greedy_decode(model, source, source_mask, tokenizer, max_len, device):
             break
 
     return decoder_input.squeeze(0)
+
+
+def beam_search_decode(model, source, source_mask, tokenizer, max_len, device,
+                       beam_size=4, length_penalty=0.6):
+    """Encoder-decoder beam search. Returns 1-D LongTensor of token ids (incl. SOS, maybe EOS).
+
+    Scores are sum of log-probs; final ranking uses length penalty:
+        score / (seq_len ** length_penalty)
+    Set beam_size=1 for greedy-equivalent behavior (prefer greedy_decode for that).
+    """
+    sos_idx = tokenizer.token_to_id('[SOS]')
+    eos_idx = tokenizer.token_to_id('[EOS]')
+    pad_idx = tokenizer.token_to_id('[PAD]')
+
+    encoder_output = model.encode(source, source_mask)  # (1, src_len, d_model)
+
+    # Each beam: (cumulative_log_prob, token_id_list)
+    beams = [(0.0, [sos_idx])]
+    completed = []
+
+    for _ in range(max_len - 1):
+        active = [(s, t) for s, t in beams if t[-1] != eos_idx]
+        for s, t in beams:
+            if t[-1] == eos_idx:
+                completed.append((s, t))
+
+        if not active:
+            break
+
+        batch_tokens = torch.tensor([t for _, t in active], dtype=torch.long, device=device)
+        bsz = batch_tokens.size(0)
+        enc = encoder_output.expand(bsz, -1, -1)
+        enc_mask = source_mask.expand(bsz, -1, -1, -1)
+        dec_mask = causal_mask(batch_tokens.size(1)).type_as(source_mask).to(device)
+
+        out = model.decode(enc, enc_mask, batch_tokens, dec_mask)
+        log_probs = torch.log_softmax(model.project(out[:, -1]), dim=-1)  # (B, vocab)
+        if pad_idx is not None:
+            log_probs = log_probs.clone()
+            log_probs[:, pad_idx] = float('-inf')
+
+        topk_log_probs, topk_idx = torch.topk(log_probs, beam_size, dim=-1)
+
+        candidates = []
+        for i, (score, tokens) in enumerate(active):
+            for k in range(beam_size):
+                token_id = int(topk_idx[i, k].item())
+                new_score = score + float(topk_log_probs[i, k].item())
+                candidates.append((new_score, tokens + [token_id]))
+
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        beams = candidates[:beam_size]
+
+    completed.extend(beams)
+    if not completed:
+        return torch.tensor([sos_idx], dtype=torch.long, device=device)
+
+    def ranked(item):
+        score, tokens = item
+        # Exclude SOS from length; avoid div-by-zero
+        length = max(len(tokens) - 1, 1)
+        return score / (length ** length_penalty)
+
+    best_tokens = max(completed, key=ranked)[1]
+    return torch.tensor(best_tokens, dtype=torch.long, device=device)
+
+
+def decode_sequence(model, source, source_mask, tokenizer, max_len, device,
+                    beam_size=1, length_penalty=0.6):
+    """Dispatch: beam_size <= 1 -> greedy; else beam search."""
+    if beam_size is None or beam_size <= 1:
+        return greedy_decode(model, source, source_mask, tokenizer, max_len, device)
+    return beam_search_decode(
+        model, source, source_mask, tokenizer, max_len, device,
+        beam_size=beam_size, length_penalty=length_penalty,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -404,16 +480,23 @@ def _stitch(segments, dedup=False, max_dedup_words=6):
 
 def transcribe_waveform(model, tokenizer, waveform, sample_rate, device=None,
                         vad_mode="silero", chunk_seconds=15.0,
-                        chunk_overlap_seconds=1.5, progress_cb=None):
+                        chunk_overlap_seconds=1.5, progress_cb=None,
+                        beam_size=None, length_penalty=None):
     """Any-length waveform -> {"text", "segments": [{start, end, text}], "chunk_mode"}.
 
     progress_cb(chunks_done, chunks_total, partial_text) fires after each chunk
     (used by the server to expose a growing transcript).
+
+    beam_size / length_penalty default from config (beam_size=1 -> greedy).
     """
     config = get_config()
     if device is None:
         device = next(model.parameters()).device
     device = torch.device(device)
+    if beam_size is None:
+        beam_size = int(config.get("beam_size", 1))
+    if length_penalty is None:
+        length_penalty = float(config.get("length_penalty", 0.6))
 
     wave = ensure_16k_mono(waveform, sample_rate)
     chunks, mode = plan_chunks(wave, vad_mode=vad_mode, chunk_seconds=chunk_seconds,
@@ -429,8 +512,11 @@ def transcribe_waveform(model, tokenizer, waveform, sample_rate, device=None,
             )
             source = encoder_input.unsqueeze(0).to(device)       # (1, T, n_mels)
             source_mask = encoder_mask.unsqueeze(0).to(device)   # (1, 1, 1, T)
-            ids = greedy_decode(model, source, source_mask, tokenizer,
-                                config["seq_len"], device)
+            ids = decode_sequence(
+                model, source, source_mask, tokenizer,
+                config["seq_len"], device,
+                beam_size=beam_size, length_penalty=length_penalty,
+            )
             text = tokenizer.decode(
                 [int(t) for t in ids.detach().cpu().tolist()],
                 skip_special_tokens=True,

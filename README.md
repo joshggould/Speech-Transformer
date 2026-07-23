@@ -45,6 +45,10 @@ python test_mel_parity.py
 # 2. Transcribe an audio file (wav/flac); best first test = a LibriSpeech clip
 python transcribe_mic.py --file path/to/clip.flac
 
+# Beam search (default beam_size=4 in config; use 1 for greedy):
+python transcribe_mic.py --file path/to/clip.flac --beam-size 4
+python transcribe_mic.py --file path/to/clip.flac --beam-size 1
+
 # 3. Transcribe from the microphone (10 s; see --list-devices if capture fails)
 python transcribe_mic.py --mic --seconds 10
 

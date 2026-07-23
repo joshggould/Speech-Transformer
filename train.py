@@ -18,12 +18,15 @@ from tokenizers.pre_tokenizers import Whitespace
 import torchmetrics
 from torch.utils.tensorboard import SummaryWriter
 from dataset import AudioDataset, causal_mask
-from inference import greedy_decode  # single copy lives in inference.py (PLAN.md)
+from inference import decode_sequence  # greedy or beam; single copy in inference.py
 
 
 def run_validation(model, validation_ds, tokenizer, max_len, device, print_msg, global_step, writer, num_examples=2):
     model.eval()
     count = 0
+    cfg = get_config()
+    beam_size = int(cfg.get("beam_size", 1))
+    length_penalty = float(cfg.get("length_penalty", 0.6))
 
     expected = []
     predicted = []
@@ -46,7 +49,10 @@ def run_validation(model, validation_ds, tokenizer, max_len, device, print_msg, 
             # check that the batch size is 1
             assert encoder_input.size(0) == 1, "Batch size must be 1 for validation"
 
-            model_out = greedy_decode(model, encoder_input, encoder_mask, tokenizer, max_len, device)
+            model_out = decode_sequence(
+                model, encoder_input, encoder_mask, tokenizer, max_len, device,
+                beam_size=beam_size, length_penalty=length_penalty,
+            )
 
             target_text = batch["text"][0]
             model_out_text = tokenizer.decode(

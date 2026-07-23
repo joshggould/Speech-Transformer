@@ -70,6 +70,10 @@ def main():
     parser.add_argument("--chunk-seconds", type=float, default=15.0)
     parser.add_argument("--overlap-seconds", type=float, default=1.5, help="Overlap in fixed-window fallback mode")
     parser.add_argument("--segments", action="store_true", help="Print per-chunk timestamps")
+    parser.add_argument("--beam-size", type=int, default=None,
+                        help="Beam width (default: config beam_size; 1 = greedy)")
+    parser.add_argument("--length-penalty", type=float, default=None,
+                        help="Beam length penalty (default: config length_penalty)")
     parser.add_argument("--cpu", action="store_true", help="Force CPU inference")
     args = parser.parse_args()
 
@@ -106,7 +110,10 @@ def main():
         model, tokenizer, waveform, rate,
         vad_mode=args.vad, chunk_seconds=args.chunk_seconds,
         chunk_overlap_seconds=args.overlap_seconds, progress_cb=progress,
+        beam_size=args.beam_size, length_penalty=args.length_penalty,
     )
+    beam = args.beam_size if args.beam_size is not None else "config"
+    print(f"beam size:  {beam}")
 
     print(f"chunk mode: {result['chunk_mode']} ({len(result['segments'])} chunk(s))")
     if args.segments:

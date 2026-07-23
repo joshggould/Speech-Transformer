@@ -17,6 +17,8 @@ def get_config():
         "tokenizer_name": "asr_bpe",  # -> tokenizer_asr_bpe.json (not the old WordLevel file)
         "tokenizer_file": "tokenizer_{0}.json",
         "bpe_vocab_size": 4000,  # good ASR starting point; try 2000–5000
+        "beam_size": 4,  # 1 = greedy; 4–8 typical for better CER/WER at test time
+        "length_penalty": 0.6,  # beam score /= len**penalty (discourage too-short hyps)
         "experiment_name": "runs/speech_transformer_bpe"
     }
 
