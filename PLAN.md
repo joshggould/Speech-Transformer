@@ -114,7 +114,6 @@ Expect: `Using device: cuda`, download of LibriSpeech `train.100`, weights under
 
 - [ ] Training runs without shape errors  
 - [ ] Validation prints TARGET vs PREDICTED that are at least vaguely related  
-- [ ] At least one `.pt` checkpoint saved  
 - [ ] `tokenizer_asr_bpe.json` exists next to training cwd  
 - [ ] At least one `.pt` under `librispeech_bpe_weights/`  
 
@@ -137,7 +136,7 @@ Implement at least:
 #### `load_model_and_tokenizer(config, device, checkpoint_path=None, tokenizer_path=None)`
 
 1. Resolve paths **against the repo directory**, not bare `Path('.')` (fix cwd-relative bug in `latest_weights_file_path` / `get_weights_file_path`).
-2. Load tokenizer **first** (`tokenizer_asr.json` or override) — vocab size drives `build_transformer(..., tgt_vocab_size=...)`.
+2. Load tokenizer **first** (`tokenizer_asr_bpe.json` or override) — vocab size drives `build_transformer(..., tgt_vocab_size=...)`.
 3. `build_transformer(n_mels, vocab, max_audio_len, seq_len, d_model=...)`.
 4. `torch.load(checkpoint, map_location=device, weights_only=True)` → `model.load_state_dict(...)` → `model.eval()`.
 5. Return `(model, tokenizer, config)`.
