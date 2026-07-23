@@ -14,6 +14,9 @@ from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Whitespace
+# --- STUDY: original WordLevel tokenizer (replaced by BPE above) ---
+# from tokenizers.models import WordLevel
+# from tokenizers.trainers import WordLevelTrainer
 
 import torchmetrics
 from torch.utils.tensorboard import SummaryWriter
@@ -117,6 +120,30 @@ def get_or_build_tokenizer(config, ds):
         print(f"Loading existing tokenizer from {tokenizer_path}")
         tokenizer = Tokenizer.from_file(str(tokenizer_path))
     return tokenizer
+
+
+# --- STUDY: original WordLevel tokenizer builder (kept for comparison) -------
+# Whole-word vocab: unseen words (e.g. finance jargon) become [UNK] and cannot
+# be spelled from pieces. BPE above fixes that. To revive WordLevel for study:
+#   1) uncomment the WordLevel imports at the top of this file
+#   2) point config tokenizer_name at "asr" (tokenizer_asr.json)
+#   3) replace get_or_build_tokenizer body with the block below
+#
+# def get_or_build_tokenizer_wordlevel(config, ds):
+#     tokenizer_path = Path(config["tokenizer_file"].format("asr"))
+#     if not tokenizer_path.exists():
+#         tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
+#         tokenizer.pre_tokenizer = Whitespace()
+#         trainer = WordLevelTrainer(
+#             special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"],
+#             min_frequency=2,
+#         )
+#         tokenizer.train_from_iterator(get_all_sentences(ds), trainer=trainer)
+#         tokenizer.save(str(tokenizer_path))
+#     else:
+#         tokenizer = Tokenizer.from_file(str(tokenizer_path))
+#     return tokenizer
+# ------------------------------------------------------------------------------
 
 def get_ds(config):
     # It only has the train split, so we divide it overselves

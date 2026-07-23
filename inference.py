@@ -210,10 +210,24 @@ def load_model_and_tokenizer(config=None, device=None, checkpoint_path=None,
 
 
 # ---------------------------------------------------------------------------
-# Decoding: greedy + beam search (train.py imports greedy_decode / decode_sequence)
+# Decoding: greedy + beam search (train.py imports decode_sequence)
+#
+# STUDY NOTES:
+# - greedy_decode is KEPT (not deleted). Beam search builds on the same
+#   encode -> decode -> project loop; greedy just takes argmax each step.
+# - decode_sequence(..., beam_size=1) calls greedy_decode.
+# - decode_sequence(..., beam_size=4) calls beam_search_decode.
+#
+# Old call site (before beam), for study:
+#   ids = greedy_decode(model, source, source_mask, tokenizer, max_len, device)
 # ---------------------------------------------------------------------------
 
 def greedy_decode(model, source, source_mask, tokenizer, max_len, device):
+    """Greedy decoding: at each step pick the single highest-probability token.
+
+    Kept for study and as the beam_size=1 path. Still correct ASR decoding;
+    beam search usually gets better CER/WER but is slower.
+    """
     sos_idx = tokenizer.token_to_id('[SOS]')
     eos_idx = tokenizer.token_to_id('[EOS]')
 
@@ -512,6 +526,9 @@ def transcribe_waveform(model, tokenizer, waveform, sample_rate, device=None,
             )
             source = encoder_input.unsqueeze(0).to(device)       # (1, T, n_mels)
             source_mask = encoder_mask.unsqueeze(0).to(device)   # (1, 1, 1, T)
+            # STUDY: old path was always greedy:
+            # ids = greedy_decode(model, source, source_mask, tokenizer,
+            #                     config["seq_len"], device)
             ids = decode_sequence(
                 model, source, source_mask, tokenizer,
                 config["seq_len"], device,
