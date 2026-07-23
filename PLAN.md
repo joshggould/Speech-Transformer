@@ -19,7 +19,7 @@ Record meeting-length audio (up to 1+ hour) on a phone, transcribe it with **our
 | `model.py` | Speech Transformer: mel → `nn.Linear(n_mels → d_model)` → encoder → decoder → text |
 | `dataset.py` | `AudioDataset`: waveform → Mel+dB → `(T, n_mels)` pad/truncate to `max_audio_len` + text decoder labels |
 | `train.py` | LibriSpeech `clean` / `train.100` training loop, WER/CER validation |
-| `config.py` | `n_mels=80`, `max_audio_len=500`, `seq_len=350`, WordLevel tokenizer path |
+| `config.py` | `n_mels=80`, `max_audio_len=500`, `seq_len=350`, **BPE** tokenizer (`tokenizer_asr_bpe.json`, vocab ~4000) |
 | `smoke_test_offline.py` | Shape smoke test (no HF download) |
 | `translate.py` | **Stale** text-translation leftover — does **not** work for speech; delete after Phase A |
 | Inference / mic / API / mobile | **Do not exist yet** |
@@ -33,13 +33,14 @@ Record meeting-length audio (up to 1+ hour) on a phone, transcribe it with **our
 
 ### Tokenizer constraint (drives finance quality later)
 
-- Today: **WordLevel** + whitespace, trained on LibriSpeech text.
-- Unknown finance terms (e.g. `EBITDA`) → `[UNK]`; WordLevel **cannot spell** unseen words.
-- Before/during SPGISpeech fine-tune: switch to **BPE** (preferred) or **characters**, and always ship **checkpoint + matching tokenizer** together (vocab size sets the projection layer).
+- **Now (retrain path):** **BPE** (~4000 merges) → `tokenizer_asr_bpe.json`, weights under `librispeech_bpe_weights/`.
+- Old WordLevel run (`tokenizer_asr.json` / `librispeech_weights/`) is a baseline only — do **not** preload those into a BPE model.
+- BPE can form rare/finance words from pieces; still rebuild/extend BPE on Libri+SPGISpeech text before finance fine-tune.
+- Always ship **checkpoint + matching tokenizer** together (vocab size sets the projection layer).
 
 ### Quality expectations (v1)
 
-LibriSpeech-trained + WordLevel + greedy decode → rough meeting transcripts (often uppercase, little punctuation, UNKs on jargon). **That is expected.** The pipeline must be model-agnostic so a better checkpoint/tokenizer drops in later without rewriting the app.
+LibriSpeech-trained + BPE + greedy decode → better than WordLevel, still rough on real meetings (limited punctuation, domain mismatch). **That is expected.** The pipeline must be model-agnostic so a better checkpoint/tokenizer drops in later without rewriting the app.
 
 ---
 
@@ -114,7 +115,8 @@ Expect: `Using device: cuda`, download of LibriSpeech `train.100`, weights under
 - [ ] Training runs without shape errors  
 - [ ] Validation prints TARGET vs PREDICTED that are at least vaguely related  
 - [ ] At least one `.pt` checkpoint saved  
-- [ ] `tokenizer_asr.json` exists next to training cwd  
+- [ ] `tokenizer_asr_bpe.json` exists next to training cwd  
+- [ ] At least one `.pt` under `librispeech_bpe_weights/`  
 
 **Do not** fine-tune finance yet. **Do not** block Lifetime 1 on perfect WER.
 
@@ -409,7 +411,7 @@ When cloud moves happen: reuse same `inference.py` + job API; put TLS and API ke
 | 6 | LAN health | phone browser hits `/health` |
 | 7 | Expo happy path | record → edit → share |
 | 8 | Long-recording hardening | 30–60 min + kill/resume |
-| 9 | BPE/char tokenizer + SPGISpeech fine-tune | finance WER on Earnings-21/22 |
+| 9 | SPGISpeech fine-tune (extend BPE on finance text) | finance WER on Earnings-21/22 |
 | 10 | Bundle swap on server | app unchanged; better transcripts |
 
 ---
@@ -466,8 +468,8 @@ fastapi uvicorn[standard] python-multipart
 | v1 storage | On-device only | Prove product before backend |
 | Long audio | Chunk ≤15–16 s | Model limit; attention cost |
 | Chunk strategy | VAD pack **+** fixed/overlap fallback | Clean cuts when possible; robust when not |
-| Tokenizer now | WordLevel | Simple for Libri learning |
-| Tokenizer for finance | BPE (or char) | Must spell EBITDA etc. |
+| Tokenizer now | **BPE (~4k)** | Retrain path; `tokenizer_asr_bpe.json` |
+| Tokenizer for finance | Same BPE, rebuild on Libri+SPGI text | Must cover EBITDA etc. |
 | Train order | Libri → then SPGISpeech | General speech first |
 | Sync vs jobs | Jobs for long form | 1 h ≈ minutes of GPU time |
 
